@@ -108,14 +108,14 @@ planeMarker.bindTooltip(
 const markerSBUR = L.marker([sbur[1], sbur[0]])
     .addTo(window.aircraftMap);
 
-    const tooltipContent =
-        `SBUR<br>
-        <span style="display:inline-block;width:50%;text-align:left">
-        ${aircraft.radial.replace('URB', '').replace('°', '')}°
-        </span>
-        <span style="display:inline-block;width:50%;text-align:right">
-        ${aircraft.distanciaNM.toFixed(0)}NM
-        </span>`;
+const tooltipContent =
+    `SBUR<br>
+    <span style="display:inline-block;width:50%;text-align:left">
+    ${aircraft.radial.replace('URB', '').replace('°', '')}°
+    </span>
+    <span style="display:inline-block;width:50%;text-align:right">
+    ${aircraft.distanciaNM.toFixed(0)}NM
+    </span>`;
 
     );
 
