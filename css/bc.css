@@ -2,7 +2,7 @@
 
 #resultado-container {
     margin-top: 20px;
-    font-size: 16px;
+    font-size: 14px;
 
 }
 #resultado-table {
@@ -11,7 +11,7 @@
     margin-top: 10px;
 }
 #resultado-table td {
-    border: none; /* Remove as bordas das células */
+    border: none; /* Remove as bordas das cÃ©lulas */
     padding-top: 4px; /* Reduz o padding superior */
     padding-bottom: 4px; /* Reduz o padding inferior */
     padding-left: 8px;
@@ -20,7 +20,7 @@
     white-space: nowrap;
 }
 #resultado-table tr {
-    border-bottom: 1px solid transparent; /* Mantém o espaçamento transparente */
+    border-bottom: 1px solid transparent; /* MantÃ©m o espaÃ§amento transparente */
 }
 .dentro-poligono-e-abaixo-f195 {
     text-decoration: underline;
