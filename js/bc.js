@@ -95,28 +95,19 @@ function abrirMapaAeronave(aircraft) {
         { icon: planeIcon }
     ).addTo(window.aircraftMap);
 
-    planeMarker.bindTooltip(aircraft.identifier, {
+planeMarker.bindTooltip(
+    `<div style="text-align:center">
+        ${aircraft.identifier}<br>
+        ${aircraft.radial.replace('URB', '').replace('°', '')}° ${aircraft.distanciaNM.toFixed(0)}NM
+    </div>`,
+    {
         permanent: true,
         direction: "top",
         offset: [0, -15]
-    });
+    }
+);
 
-    const markerSBUR = L.marker([sbur[1], sbur[0]]).addTo(window.aircraftMap);
-
-    const tooltipContent =
-        `SBUR<br>
-        <span style="display:inline-block;width:50%;text-align:left">
-        ${aircraft.radial.replace('URB', '').replace('°', '')}°
-        </span>
-        <span style="display:inline-block;width:50%;text-align:right">
-        ${aircraft.distanciaNM.toFixed(0)}NM
-        </span>`;
-
-    markerSBUR.bindTooltip(tooltipContent, {
-        permanent: true,
-        direction: "top",
-        offset: [0, -15]
-    });
+const markerSBUR = L.marker([sbur[1], sbur[0]]).addTo(window.aircraftMap);
 
     L.polyline(
         [
