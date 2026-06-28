@@ -104,6 +104,7 @@ planeMarker.bindTooltip(
         permanent: true,
         direction: "top",
         offset: [0, -15]
+        className: "tooltip-aeronave"
     }
 );
 
