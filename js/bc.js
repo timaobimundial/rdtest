@@ -103,7 +103,7 @@ planeMarker.bindTooltip(
     {
         permanent: true,
         direction: "top",
-        offset: [0, -15]
+        offset: [0, -15],
         className: "tooltip-aeronave"
     }
 );
