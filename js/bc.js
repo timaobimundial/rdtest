@@ -172,7 +172,10 @@ async function buscarAeronavesProximas() {
             const registration = aircraft.r || '';
             const identifier = callsign || registration || '------';
 
-            const altitudePes = aircraft.alt_baro != null ? Math.round(aircraft.alt_baro) : '';
+const altitudePes =
+    aircraft.alt_baro != null && !isNaN(Number(aircraft.alt_baro))
+        ? Math.round(Number(aircraft.alt_baro))
+        : '';
             const velocidadeKnots = aircraft.gs != null ? Math.round(aircraft.gs) : '';
             const heading = aircraft.track != null ? Math.round(aircraft.track) : null;
 
@@ -261,9 +264,9 @@ aircraftData.forEach(aircraft => {
 
             const altitudeNaTabela = aircraft.altitude;
 
-            const nivelDeVooAbaixoDe195 =
-                altitudeNaTabela.startsWith('F') &&
-                parseInt(altitudeNaTabela.substring(1)) <= 195;
+const nivelDeVooAbaixoDe195 =
+    aircraft.flightLevel != null &&
+    aircraft.flightLevel <= 195;
 
 if (aircraft.dentroPoligono && nivelDeVooAbaixoDe195) {
     identifierCell.classList.add('dentro-poligono-e-abaixo-f195');
