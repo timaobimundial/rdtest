@@ -33,31 +33,30 @@ window.aeronavesExibidas = [];
 window.linhasSBUR = [];
 window.linhasRumo = [];
 
-// NOVA FUNÇÃO: Limpa os desenhos e marcadores antigos do mapa para não acumular lixo na memória
+// Função que limpa os desenhos e marcadores do mapa antes de gerar uma nova visualização
 function limparMapaCompleto() {
     if (window.aircraftMap) {
-        // Remove as linhas de SBUR do mapa
         if (window.linhasSBUR) {
             window.linhasSBUR.forEach(linha => window.aircraftMap.removeLayer(linha));
         }
-        // Remove as linhas de Rumo do mapa
         if (window.linhasRumo) {
             window.linhasRumo.forEach(linha => window.aircraftMap.removeLayer(linha));
         }
-        // Remove os marcadores dos aviões antigos que ficaram desenhados
         if (window.aeronavesExibidas) {
             window.aeronavesExibidas.forEach(ac => {
                 if (ac.marker) window.aircraftMap.removeLayer(ac.marker);
             });
         }
     }
-    // Zera as variáveis globais de controle
     window.aeronavesExibidas = [];
     window.linhasSBUR = [];
     window.linhasRumo = [];
 }
 
 function abrirMapaAeronave(aircraft) {
+    // CORREÇÃO 1 e 2: Limpa dados fantasmas na memória antes de iniciar a nova consulta de mapa
+    limparMapaCompleto();
+    
     if (!window.aeronavesExibidas) window.aeronavesExibidas = [];
     if (!window.linhasSBUR) window.linhasSBUR = [];
     if (!window.linhasRumo) window.linhasRumo = [];
@@ -163,10 +162,13 @@ function abrirMapaAeronave(aircraft) {
             const rumo = parseInt(ac.rumoMagnetic);
             if (isNaN(rumo)) return;
 
+            // CORREÇÃO 3: Compensação de -22º aplicada ao rumo verdadeiro exigido pelo Turf
+            const rumoVerdadeiroCompensado = (rumo - 22 + 360) % 360;
+
             const destino = turf.destination(
                 turf.point([ac.longitude, ac.latitude]),
                 500,
-                rumo,
+                rumoVerdadeiroCompensado,
                 { units: 'kilometers' }
             );
 
@@ -199,9 +201,6 @@ function abrirMapaAeronave(aircraft) {
 }
 
 async function buscarAeronavesProximas() {
-    // Executa a limpeza aqui para garantir que o mapa comece totalmente limpo em novas consultas
-    limparMapaCompleto();
-
     const sburLongitude = sbur[0];
     const sburLatitude = sbur[1];
 
@@ -241,7 +240,7 @@ async function buscarAeronavesProximas() {
                 aircraft.alt_baro != null && !isNaN(Number(aircraft.alt_baro))
                     ? Math.round(Number(aircraft.alt_baro))
                     : '';
-            const velocidadeKnots = aircraft.gs != null ? Math.round(aircraft.gs) : '';
+            const velocidadKnots = aircraft.gs != null ? Math.round(aircraft.gs) : '';
             const heading = aircraft.track != null ? Math.round(aircraft.track) : null;
 
             const aircraftType = (aircraft.t || aircraft.type || '').replace("adsb_icao", "----");
@@ -298,7 +297,7 @@ async function buscarAeronavesProximas() {
                 identifier,
                 aircraftType,
                 altitude: flStr,
-                velocidade: velocidadeKnots || '---',
+                velocidade: velocidadKnots || '---',
                 squawkCode,
                 radial: 'URB' + radialSburStr + '°',
                 distanciaNM: distanciaSburNM,
