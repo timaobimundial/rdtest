@@ -32,8 +32,8 @@ window.aircraftMap = null;
 window.aeronavesExibidas = [];
 window.linhasSBUR = [];
 window.linhasRumo = [];
+window.mapaFechado = true; // Controla se é uma nova consulta do mapa vinda do zero
 
-// Função que limpa os desenhos e marcadores do mapa antes de gerar uma nova visualização
 function limparMapaCompleto() {
     if (window.aircraftMap) {
         if (window.linhasSBUR) {
@@ -54,8 +54,11 @@ function limparMapaCompleto() {
 }
 
 function abrirMapaAeronave(aircraft) {
-    // CORREÇÃO 1 e 2: Limpa dados fantasmas na memória antes de iniciar a nova consulta de mapa
-    limparMapaCompleto();
+    // Se o mapa estava fechado e esta é a primeira abertura, limpa os dados antigos de verdade
+    if (window.mapaFechado) {
+        limparMapaCompleto();
+        window.mapaFechado = false; // Altera o estado para aberto
+    }
     
     if (!window.aeronavesExibidas) window.aeronavesExibidas = [];
     if (!window.linhasSBUR) window.linhasSBUR = [];
@@ -99,6 +102,11 @@ function abrirMapaAeronave(aircraft) {
             fillOpacity: 0.5,
             weight: 0.5
         }).addTo(window.aircraftMap);
+    }
+
+    // Garante que o marcador não seja duplicado se o avião já estiver na tela
+    if (aircraft.marker && window.aircraftMap.hasLayer(aircraft.marker)) {
+        window.aircraftMap.removeLayer(aircraft.marker);
     }
 
     const rotation = aircraft.rumoMagnetic !== '---' ? parseInt(aircraft.rumoMagnetic) - 22 : 0;
@@ -162,7 +170,7 @@ function abrirMapaAeronave(aircraft) {
             const rumo = parseInt(ac.rumoMagnetic);
             if (isNaN(rumo)) return;
 
-            // CORREÇÃO 3: Compensação de -22º aplicada ao rumo verdadeiro exigido pelo Turf
+            // Rumo geográfico corrigido usando a declinação magnética para sincronizar com o nariz do avião
             const rumoVerdadeiroCompensado = (rumo - 22 + 360) % 360;
 
             const destino = turf.destination(
@@ -201,6 +209,9 @@ function abrirMapaAeronave(aircraft) {
 }
 
 async function buscarAeronavesProximas() {
+    // Quando uma nova requisição de busca acontece na tabela, assumimos que o fluxo de mapas anterior encerrou
+    window.mapaFechado = true;
+
     const sburLongitude = sbur[0];
     const sburLatitude = sbur[1];
 
