@@ -30,9 +30,13 @@ const polygonCoordinates = [
 const polygon = turf.polygon([polygonCoordinates]);
 
 window.aircraftMap = null;
+window.aeronavesExibidas = [];
+window.linhasSBUR = [];
+window.linhasRumo = [];
 
 function abrirMapaAeronave(aircraft) {
 
+    window.aeronavesExibidas.push(aircraft);
     const mapDiv = document.getElementById('map');
     const metarContainer = document.querySelector('.container_metar');
 
@@ -50,9 +54,7 @@ function abrirMapaAeronave(aircraft) {
         mapDiv.style.zIndex = '9999';
     }
 
-    if (window.aircraftMap) {
-        window.aircraftMap.remove();
-    }
+if (!window.aircraftMap) {
 
     window.aircraftMap = L.map('map', {
         scrollWheelZoom: true
@@ -70,6 +72,7 @@ function abrirMapaAeronave(aircraft) {
         fillOpacity: 0.5,
         weight: 0.5
     }).addTo(window.aircraftMap);
+}
 
     const rotation =
         aircraft.rumoMagnetic !== '---'
@@ -90,11 +93,12 @@ function abrirMapaAeronave(aircraft) {
         iconAnchor: [8, 8]
     });
 
-    const planeMarker = L.marker(
-        [aircraft.latitude, aircraft.longitude],
-        { icon: planeIcon }
-    ).addTo(window.aircraftMap);
+const planeMarker = L.marker(
+    [aircraft.latitude, aircraft.longitude],
+    { icon: planeIcon }
+).addTo(window.aircraftMap);
 
+window.aeronavesExibidas[window.aeronavesExibidas.length - 1].marker = planeMarker;
 planeMarker.bindTooltip(
     `<div style="text-align:center">
         ${aircraft.identifier}<br>
@@ -108,7 +112,11 @@ planeMarker.bindTooltip(
     }
 );
 
-const markerSBUR = L.marker([sbur[1], sbur[0]]).addTo(window.aircraftMap);
+if (!window.markerSBUR) {
+    window.markerSBUR = L.marker([sbur[1], sbur[0]]).addTo(window.aircraftMap);
+}
+
+if (window.aeronavesExibidas.length === 1) {
 
     L.polyline(
         [
@@ -117,16 +125,75 @@ const markerSBUR = L.marker([sbur[1], sbur[0]]).addTo(window.aircraftMap);
         ],
         { color: '#7fb0d4' }
     ).addTo(window.aircraftMap);
+}
 
-    const bounds = L.latLngBounds([
-        [sbur[1], sbur[0]],
-        [aircraft.latitude, aircraft.longitude]
-    ]);
+const bounds = L.latLngBounds([[sbur[1], sbur[0]]]);
 
-    window.aircraftMap.fitBounds(bounds, {
-        paddingTopLeft: [90, 90],
-        paddingBottomRight: [50, 50]
+window.aeronavesExibidas.forEach(ac => {
+    bounds.extend([ac.latitude, ac.longitude]);
+});
+
+if (window.linhasSBUR) {
+    window.linhasSBUR.forEach(linha => window.aircraftMap.removeLayer(linha));
+}
+
+window.linhasSBUR = [];
+
+if (window.aeronavesExibidas.length === 1) {
+
+    const linha = L.polyline(
+        [
+            [sbur[1], sbur[0]],
+            [window.aeronavesExibidas[0].latitude, window.aeronavesExibidas[0].longitude]
+        ],
+        { color: '#7fb0d4' }
+    ).addTo(window.aircraftMap);
+
+    window.linhasSBUR.push(linha);
+}
+
+if (window.linhasRumo) {
+    window.linhasRumo.forEach(linha => window.aircraftMap.removeLayer(linha));
+}
+
+window.linhasRumo = [];
+
+if (window.aeronavesExibidas.length > 1) {
+
+    window.aeronavesExibidas.forEach(ac => {
+
+        if (ac.rumoMagnetic === '---') return;
+
+        const destino = turf.destination(
+            turf.point([ac.longitude, ac.latitude]),
+            500,
+            parseInt(ac.rumoMagnetic) - declinacaoSBUR,
+            { units: 'kilometers' }
+        );
+
+        const linha = L.polyline(
+            [
+                [ac.latitude, ac.longitude],
+                [
+                    destino.geometry.coordinates[1],
+                    destino.geometry.coordinates[0]
+                ]
+            ],
+            {
+                color: '#7fb0d4',
+                weight: 1
+            }
+        ).addTo(window.aircraftMap);
+
+        window.linhasRumo.push(linha);
+
     });
+}
+    
+window.aircraftMap.fitBounds(bounds, {
+    paddingTopLeft: [90, 90],
+    paddingBottomRight: [50, 50]
+});
 
     setTimeout(() => {
         window.aircraftMap.invalidateSize();
