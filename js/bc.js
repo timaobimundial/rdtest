@@ -54,8 +54,6 @@ function limparMapaCompleto() {
 }
 
 function abrirMapaAeronave(aircraft) {
-    // REMOVIDO: limparMapaCompleto() daqui para permitir o acúmulo de cliques sequenciais
-    
     if (!window.aeronavesExibidas) window.aeronavesExibidas = [];
     if (!window.linhasSBUR) window.linhasSBUR = [];
     if (!window.linhasRumo) window.linhasRumo = [];
@@ -150,9 +148,9 @@ function abrirMapaAeronave(aircraft) {
     window.linhasRumo.forEach(linha => window.aircraftMap.removeLayer(linha));
     window.linhasRumo = [];
 
-    // ALTERAÇÃO DO FLUXO: Avaliação baseada no total de aeronaves acumuladas na tela
+    // LÓGICA DE EXIBIÇÃO DAS LINHAS
     if (window.aeronavesExibidas.length === 1) {
-        // Exibe apenas a linha para SBUR
+        // Exibe apenas a linha para SBUR se houver apenas 1 avião ativo clicado
         const linha = L.polyline(
             [
                 [sbur[1], sbur[0]],
@@ -163,7 +161,7 @@ function abrirMapaAeronave(aircraft) {
 
         window.linhasSBUR.push(linha);
     } else if (window.aeronavesExibidas.length >= 2) {
-        // Se houver 2 ou mais, a linha SBUR não é gerada e desenha-se a linha de proa/rumo no nariz de todos
+        // Se houver 2 ou mais, a linha SBUR não é gerada e desenha-se a linha de rumo no nariz de todos
         window.aeronavesExibidas.forEach(ac => {
             const rumo = parseInt(ac.rumoMagnetic);
             if (isNaN(rumo)) return;
@@ -206,7 +204,7 @@ function abrirMapaAeronave(aircraft) {
 }
 
 async function buscarAeronavesProximas() {
-    // Quando uma nova consulta for disparada na tabela pelo temporizador ou ação, zera o mapa
+    // Quando uma nova consulta global for disparada na tabela pelo temporizador, zera o mapa
     limparMapaCompleto();
 
     const sburLongitude = sbur[0];
@@ -392,6 +390,20 @@ async function buscarAeronavesProximas() {
 
         resultadoTable.style.display = 'table';
         imagemCarregamento.style.display = 'none';
+
+        // GATILHO DO BOTÃO DE FECHAR (X): Escuta quando o botão X do mapa for clicado
+        setTimeout(() => {
+            // Busca por elementos dentro ou ao redor da div do mapa que contenham a letra 'X'
+            const elementosDoMapa = document.querySelectorAll('#map button, #map .custom-close, #map div, .leaflet-control-container div');
+            elementosDoMapa.forEach(el => {
+                if (el.textContent.trim() === 'X') {
+                    el.addEventListener('click', () => {
+                        limparMapaCompleto(); // Zera os arrays de memória para a próxima consulta começar limpa
+                        document.getElementById('map').style.display = 'none';
+                    });
+                }
+            });
+        }, 500);
 
     } catch (err) {
         console.error(err);
