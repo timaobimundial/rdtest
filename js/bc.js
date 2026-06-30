@@ -185,7 +185,7 @@ function abrirMapaAeronave(aircraft) {
                 ],
                 {
                     color: '#7fb0d4',
-                    weight: 1
+                    weight: 2
                 }
             ).addTo(window.aircraftMap);
 
