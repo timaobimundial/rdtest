@@ -115,10 +115,9 @@ planeMarker.bindTooltip(
     }
 );
 
-if (!window.markerSBUR) {
+if (!window.markerSBUR || !window.aircraftMap.hasLayer(window.markerSBUR)) {
     window.markerSBUR = L.marker([sbur[1], sbur[0]]).addTo(window.aircraftMap);
 }
-
 
 
 const bounds = L.latLngBounds([[sbur[1], sbur[0]]]);
@@ -156,14 +155,16 @@ if (window.aeronavesExibidas.length > 1) {
 
     window.aeronavesExibidas.forEach(ac => {
 
-        if (ac.rumoMagnetic === '---') return;
+const rumo = parseInt(ac.rumoMagnetic);
 
-        const destino = turf.destination(
-            turf.point([ac.longitude, ac.latitude]),
-            500,
-            parseInt(ac.rumoMagnetic) - 22,
-            { units: 'kilometers' }
-        );
+if (isNaN(rumo)) return;
+
+const destino = turf.destination(
+    turf.point([ac.longitude, ac.latitude]),
+    500,
+    rumo,
+    { units: 'kilometers' }
+);
 
         const linha = L.polyline(
             [
