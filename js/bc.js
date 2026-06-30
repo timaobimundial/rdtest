@@ -36,7 +36,7 @@ window.linhasRumo = [];
 
 function abrirMapaAeronave(aircraft) {
 
-    window.aeronavesExibidas.push(aircraft);
+window.aeronavesExibidas = [aircraft];
     const mapDiv = document.getElementById('map');
     const metarContainer = document.querySelector('.container_metar');
 
@@ -130,7 +130,7 @@ if (window.linhasSBUR) {
 
 window.linhasSBUR = [];
 
-if (window.aeronavesExibidas.length === 1) {
+if (window.aeronavesExibidas.length >= 1) {
 
     const linha = L.polyline(
         [
