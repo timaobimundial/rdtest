@@ -35,7 +35,10 @@ window.linhasSBUR = [];
 window.linhasRumo = [];
 
 function abrirMapaAeronave(aircraft) {
-
+window.aeronavesExibidas = [];
+window.linhasSBUR = [];
+window.linhasRumo = [];
+    
 window.aeronavesExibidas = [aircraft];
     const mapDiv = document.getElementById('map');
     const metarContainer = document.querySelector('.container_metar');
