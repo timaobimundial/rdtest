@@ -116,16 +116,7 @@ if (!window.markerSBUR) {
     window.markerSBUR = L.marker([sbur[1], sbur[0]]).addTo(window.aircraftMap);
 }
 
-if (window.aeronavesExibidas.length === 1) {
 
-    L.polyline(
-        [
-            [sbur[1], sbur[0]],
-            [aircraft.latitude, aircraft.longitude]
-        ],
-        { color: '#7fb0d4' }
-    ).addTo(window.aircraftMap);
-}
 
 const bounds = L.latLngBounds([[sbur[1], sbur[0]]]);
 
@@ -167,7 +158,7 @@ if (window.aeronavesExibidas.length > 1) {
         const destino = turf.destination(
             turf.point([ac.longitude, ac.latitude]),
             500,
-            parseInt(ac.rumoMagnetic) - declinacaoSBUR,
+            parseInt(ac.rumoMagnetic) - 22,
             { units: 'kilometers' }
         );
 
