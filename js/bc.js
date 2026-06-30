@@ -132,7 +132,7 @@ if (window.linhasSBUR) {
 
 window.linhasSBUR = [];
 
-if (window.aeronavesExibidas.length >= 1) {
+if (window.aeronavesExibidas.length === 1) {
 
     const linha = L.polyline(
         [
@@ -151,12 +151,15 @@ if (window.linhasRumo) {
 
 window.linhasRumo = [];
 
-if (window.aeronavesExibidas.length > 1) {
+if (window.aeronavesExibidas.length >= 1) {
 
     window.aeronavesExibidas.forEach(ac => {
 
 const rumo = parseInt(ac.rumoMagnetic);
 
+if (isNaN(rumo)) return;
+
+const rumo = parseInt(ac.rumoMagnetic);
 if (isNaN(rumo)) return;
 
 const destino = turf.destination(
