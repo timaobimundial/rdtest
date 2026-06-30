@@ -33,7 +33,7 @@ window.aeronavesExibidas = [];
 window.linhasSBUR = [];
 window.linhasRumo = [];
 
-// Limpa todas as camadas antigas de aeronaves e trajetórias do mapa
+// Limpa de forma absoluta todas as camadas do Leaflet e reseta os arrays de memória
 function limparMapaCompleto() {
     if (window.aircraftMap) {
         if (window.linhasSBUR) {
@@ -53,11 +53,18 @@ function limparMapaCompleto() {
     window.linhasRumo = [];
 }
 
-// Renderiza no mapa o grupo de aeronaves atualizado recebido pela busca
-function renderizarMapaComAeronaves(listaAeronaves) {
-    // 1. Limpa o que for antigo antes de desenhar a nova situação da API
-    limparMapaCompleto();
-    window.aeronavesExibidas = [...listaAeronaves];
+function abrirMapaAeronave(aircraft) {
+    // REMOVIDO: limparMapaCompleto() daqui para permitir o acúmulo de cliques sequenciais
+    
+    if (!window.aeronavesExibidas) window.aeronavesExibidas = [];
+    if (!window.linhasSBUR) window.linhasSBUR = [];
+    if (!window.linhasRumo) window.linhasRumo = [];
+    
+    // Evita duplicar a mesma aeronave caso o usuário clique duas vezes seguidas no mesmo ícone
+    const jaExiste = window.aeronavesExibidas.some(ac => ac.identifier === aircraft.identifier);
+    if (!jaExiste) {
+        window.aeronavesExibidas.push(aircraft);
+    }
 
     const mapDiv = document.getElementById('map');
     const metarContainer = document.querySelector('.container_metar');
@@ -75,7 +82,6 @@ function renderizarMapaComAeronaves(listaAeronaves) {
         mapDiv.style.zIndex = '9999';
     }
 
-    // Inicializa o Leaflet se ainda não existir
     if (!window.aircraftMap) {
         window.aircraftMap = L.map('map', {
             scrollWheelZoom: true
@@ -95,48 +101,58 @@ function renderizarMapaComAeronaves(listaAeronaves) {
         }).addTo(window.aircraftMap);
     }
 
+    // Se a aeronave já tinha um marcador ativo, remove para redesenhar atualizado
+    if (aircraft.marker && window.aircraftMap.hasLayer(aircraft.marker)) {
+        window.aircraftMap.removeLayer(aircraft.marker);
+    }
+
+    const rotation = aircraft.rumoMagnetic !== '---' ? parseInt(aircraft.rumoMagnetic) - 22 : 0;
+
+    const planeIcon = L.divIcon({
+        className: 'plane-div-icon',
+        html: `<img src="arq/planebcmap.png" style="transform: rotate(${rotation}deg); transform-origin:center;">`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+    });
+
+    const planeMarker = L.marker(
+        [aircraft.latitude, aircraft.longitude],
+        { icon: planeIcon }
+    ).addTo(window.aircraftMap);
+
+    aircraft.marker = planeMarker;
+
+    planeMarker.bindTooltip(
+        `<div style="text-align:center">
+            ${aircraft.identifier}<br>
+            ${aircraft.radial.replace('URB', '').replace('°', '')}° ${aircraft.distanciaNM.toFixed(0)}NM
+        </div>`,
+        {
+            permanent: true,
+            direction: "top",
+            offset: [0, -15],
+            className: "tooltip-aeronave"
+        }
+    );
+
     if (!window.markerSBUR || !window.aircraftMap.hasLayer(window.markerSBUR)) {
         window.markerSBUR = L.marker([sbur[1], sbur[0]]).addTo(window.aircraftMap);
     }
 
     const bounds = L.latLngBounds([[sbur[1], sbur[0]]]);
-
-    // Desenha cada aeronave da lista atual
-    window.aeronavesExibidas.forEach(aircraft => {
-        const rotation = aircraft.rumoMagnetic !== '---' ? parseInt(aircraft.rumoMagnetic) - 22 : 0;
-
-        const planeIcon = L.divIcon({
-            className: 'plane-div-icon',
-            html: `<img src="arq/planebcmap.png" style="transform: rotate(${rotation}deg); transform-origin:center;">`,
-            iconSize: [16, 16],
-            iconAnchor: [8, 8]
-        });
-
-        const planeMarker = L.marker(
-            [aircraft.latitude, aircraft.longitude],
-            { icon: planeIcon }
-        ).addTo(window.aircraftMap);
-
-        aircraft.marker = planeMarker;
-
-        planeMarker.bindTooltip(
-            `<div style="text-align:center">
-                ${aircraft.identifier}<br>
-                ${aircraft.radial.replace('URB', '').replace('°', '')}° ${aircraft.distanciaNM.toFixed(0)}NM
-            </div>`,
-            {
-                permanent: true,
-                direction: "top",
-                offset: [0, -15],
-                className: "tooltip-aeronave"
-            }
-        );
-
-        bounds.extend([aircraft.latitude, aircraft.longitude]);
+    window.aeronavesExibidas.forEach(ac => {
+        bounds.extend([ac.latitude, ac.longitude]);
     });
 
-    // REGRA 1: Se houver apenas 1 aeronave ativa na consulta, desenha a linha para SBUR
+    // Limpa as linhas antigas para reavaliar o cenário atualizado
+    window.linhasSBUR.forEach(linha => window.aircraftMap.removeLayer(linha));
+    window.linhasSBUR = [];
+    window.linhasRumo.forEach(linha => window.aircraftMap.removeLayer(linha));
+    window.linhasRumo = [];
+
+    // ALTERAÇÃO DO FLUXO: Avaliação baseada no total de aeronaves acumuladas na tela
     if (window.aeronavesExibidas.length === 1) {
+        // Exibe apenas a linha para SBUR
         const linha = L.polyline(
             [
                 [sbur[1], sbur[0]],
@@ -146,15 +162,12 @@ function renderizarMapaComAeronaves(listaAeronaves) {
         ).addTo(window.aircraftMap);
 
         window.linhasSBUR.push(linha);
-    } 
-
-    // REGRA 2: Se houver 2 ou mais aeronaves, desenha as linhas de rumo projetadas à frente (-22° corrigido)
-    if (window.aeronavesExibidas.length >= 2) {
+    } else if (window.aeronavesExibidas.length >= 2) {
+        // Se houver 2 ou mais, a linha SBUR não é gerada e desenha-se a linha de proa/rumo no nariz de todos
         window.aeronavesExibidas.forEach(ac => {
             const rumo = parseInt(ac.rumoMagnetic);
             if (isNaN(rumo)) return;
 
-            // Ajuste do rumo para que a projeção do Turf saia exatamente pela proa do avião
             const rumoVerdadeiroCompensado = (rumo - 22 + 360) % 360;
 
             const destino = turf.destination(
@@ -193,6 +206,9 @@ function renderizarMapaComAeronaves(listaAeronaves) {
 }
 
 async function buscarAeronavesProximas() {
+    // Quando uma nova consulta for disparada na tabela pelo temporizador ou ação, zera o mapa
+    limparMapaCompleto();
+
     const sburLongitude = sbur[0];
     const sburLatitude = sbur[1];
 
@@ -208,8 +224,6 @@ async function buscarAeronavesProximas() {
             mensagemCarregamento.textContent = 'NIL';
             imagemCarregamento.style.display = 'none';
             resultadoTable.style.display = 'none';
-            // Se não há aviões, limpa o mapa anterior completamente
-            limparMapaCompleto();
             return;
         }
 
@@ -365,9 +379,8 @@ async function buscarAeronavesProximas() {
                     ? `rotate(${parseInt(aircraft.rumoMagnetic) - 22}deg)`
                     : 'rotate(0deg)';
 
-            // Ao clicar no avião, ele renderiza o conjunto completo tratado na busca atual
             planeImg.addEventListener('click', function () {
-                renderizarMapaComAeronaves(aircraftData);
+                abrirMapaAeronave(aircraft);
             });
 
             planeCell.appendChild(planeImg);
