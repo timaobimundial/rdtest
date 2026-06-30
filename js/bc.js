@@ -110,7 +110,7 @@ function abrirMapaAeronave(aircraft) {
         className: 'plane-div-icon',
         html: `<img src="arq/planebcmap.png" style="transform: rotate(${rotation}deg); transform-origin:center;">`,
         iconSize: [16, 16],
-        iconAnchor: [8, 8]
+        iconAnchor: [8.5, 8]
     });
 
     const planeMarker = L.marker(
