@@ -32,6 +32,27 @@ window.aircraftMap = null;
 window.aeronavesExibidas = [];
 window.linhasSBUR = [];
 window.linhasRumo = [];
+window.mapaFechado = true; // Controla o estado do mapa
+
+// RASTREADOR AUTOMÁTICO: Limpa a memória assim que o mapa for fechado (display: none)
+const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'style') {
+            const mapDivElement = document.getElementById('map');
+            if (mapDivElement && window.getComputedStyle(mapDivElement).display === 'none') {
+                window.mapaFechado = true;
+                limparMapaCompleto(); 
+            }
+        }
+    });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const mapDivElement = document.getElementById('map');
+    if (mapDivElement) {
+        observer.observe(mapDivElement, { attributes: true });
+    }
+});
 window.mapaFechado = true; // Controla se é uma nova consulta do mapa vinda do zero
 
 function limparMapaCompleto() {
