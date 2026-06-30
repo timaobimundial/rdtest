@@ -156,10 +156,6 @@ if (window.aeronavesExibidas.length >= 1) {
     window.aeronavesExibidas.forEach(ac => {
 
 const rumo = parseInt(ac.rumoMagnetic);
-
-if (isNaN(rumo)) return;
-
-const rumo = parseInt(ac.rumoMagnetic);
 if (isNaN(rumo)) return;
 
 const destino = turf.destination(
