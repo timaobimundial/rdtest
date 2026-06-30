@@ -143,6 +143,11 @@ if (window.aeronavesExibidas.length === 1) {
     ).addTo(window.aircraftMap);
 
     window.linhasSBUR.push(linha);
+
+} else {
+
+    window.linhasSBUR.forEach(l => window.aircraftMap.removeLayer(l));
+    window.linhasSBUR = [];
 }
 
 if (window.linhasRumo) {
@@ -151,7 +156,12 @@ if (window.linhasRumo) {
 
 window.linhasRumo = [];
 
-if (window.aeronavesExibidas.length >= 1) {
+if (window.aeronavesExibidas.length <= 1) {
+    window.linhasRumo.forEach(l => window.aircraftMap.removeLayer(l));
+    window.linhasRumo = [];
+}
+    
+if (window.aeronavesExibidas.length > 1) {
 
     window.aeronavesExibidas.forEach(ac => {
 
