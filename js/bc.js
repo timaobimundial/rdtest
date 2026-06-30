@@ -7,7 +7,6 @@ const resultadoContainer = document.getElementById('resultado-container');
 const mensagemCarregamento = document.getElementById('mensagem-carregamento');
 const imagemCarregamento = mensagemCarregamento.querySelector('img');
 
-
 const API_URL = "https://rdtest-peach.vercel.app/api/bc";
 
 // polígono SBUR
@@ -35,17 +34,10 @@ window.linhasSBUR = [];
 window.linhasRumo = [];
 
 function abrirMapaAeronave(aircraft) {
-window.aeronavesExibidas = [];
-window.linhasSBUR = [];
-window.linhasRumo = [];
-    
-function abrirMapaAeronave(aircraft) {
-    // 1. Inicializa os arrays globais se ainda não existirem
     if (!window.aeronavesExibidas) window.aeronavesExibidas = [];
     if (!window.linhasSBUR) window.linhasSBUR = [];
     if (!window.linhasRumo) window.linhasRumo = [];
     
-    // 2. Evita adicionar o mesmo avião repetido no mapa se clicar duas vezes
     const jaExiste = window.aeronavesExibidas.some(ac => ac.identifier === aircraft.identifier);
     if (!jaExiste) {
         window.aeronavesExibidas.push(aircraft);
@@ -86,14 +78,11 @@ function abrirMapaAeronave(aircraft) {
         }).addTo(window.aircraftMap);
     }
 
-    // Renderiza o marcador do avião atual que acabou de ser clicado
     const rotation = aircraft.rumoMagnetic !== '---' ? parseInt(aircraft.rumoMagnetic) - 22 : 0;
 
     const planeIcon = L.divIcon({
         className: 'plane-div-icon',
-        html: `
-            <img src="arq/planebcmap.png" style="transform: rotate(${rotation}deg); transform-origin:center;">
-        `,
+        html: `<img src="arq/planebcmap.png" style="transform: rotate(${rotation}deg); transform-origin:center;">`,
         iconSize: [16, 16],
         iconAnchor: [8, 8]
     });
@@ -103,7 +92,6 @@ function abrirMapaAeronave(aircraft) {
         { icon: planeIcon }
     ).addTo(window.aircraftMap);
 
-    // Salva a referência do marker no objeto do avião para controle futuro se necessário
     aircraft.marker = planeMarker;
 
     planeMarker.bindTooltip(
@@ -123,18 +111,14 @@ function abrirMapaAeronave(aircraft) {
         window.markerSBUR = L.marker([sbur[1], sbur[0]]).addTo(window.aircraftMap);
     }
 
-    // Define os limites do mapa englobando SBUR e todos os aviões na tela
     const bounds = L.latLngBounds([[sbur[1], sbur[0]]]);
     window.aeronavesExibidas.forEach(ac => {
         bounds.extend([ac.latitude, ac.longitude]);
     });
 
-    // --- LÓGICA DAS LINHAS SBUR ---
-    // Limpa as linhas antigas para SBUR
     window.linhasSBUR.forEach(linha => window.aircraftMap.removeLayer(linha));
     window.linhasSBUR = [];
 
-    // Se houver APENAS 1 avião exibido, desenha a linha dele até SBUR
     if (window.aeronavesExibidas.length === 1) {
         const linha = L.polyline(
             [
@@ -146,20 +130,15 @@ function abrirMapaAeronave(aircraft) {
 
         window.linhasSBUR.push(linha);
     } 
-    // Se tiver 2 ou mais, a linha para SBUR não é gerada (e as anteriores já foram limpas acima)
 
-    // --- LÓGICA DAS LINHAS DE RUMO (RM) ---
-    // Limpa as linhas de rumo anteriores para redesenhar
     window.linhasRumo.forEach(linha => window.aircraftMap.removeLayer(linha));
     window.linhasRumo = [];
 
-    // Se tiver 2 ou mais aviões, exibe a linha de rumo (RM) saindo do nariz de cada um
     if (window.aeronavesExibidas.length >= 2) {
         window.aeronavesExibidas.forEach(ac => {
             const rumo = parseInt(ac.rumoMagnetic);
             if (isNaN(rumo)) return;
 
-            // Calcula o ponto de destino baseado no rumo (500km à frente)
             const destino = turf.destination(
                 turf.point([ac.longitude, ac.latitude]),
                 500,
@@ -193,7 +172,7 @@ function abrirMapaAeronave(aircraft) {
     setTimeout(() => {
         window.aircraftMap.invalidateSize();
     }, 100);
-}
+} // <--- ESSA CHAVE FECHA A FUNÇÃO CORRETAMENTE
 
 async function buscarAeronavesProximas() {
 
