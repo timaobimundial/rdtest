@@ -32,29 +32,8 @@ window.aircraftMap = null;
 window.aeronavesExibidas = [];
 window.linhasSBUR = [];
 window.linhasRumo = [];
-window.mapaFechado = true; // Controla o estado do mapa
 
-// RASTREADOR AUTOMÁTICO: Limpa a memória assim que o mapa for fechado (display: none)
-const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-        if (mutation.attributeName === 'style') {
-            const mapDivElement = document.getElementById('map');
-            if (mapDivElement && window.getComputedStyle(mapDivElement).display === 'none') {
-                window.mapaFechado = true;
-                limparMapaCompleto(); 
-            }
-        }
-    });
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-    const mapDivElement = document.getElementById('map');
-    if (mapDivElement) {
-        observer.observe(mapDivElement, { attributes: true });
-    }
-});
-window.mapaFechado = true; // Controla se é uma nova consulta do mapa vinda do zero
-
+// Limpa de forma absoluta todas as camadas do Leaflet e reseta os arrays de memória
 function limparMapaCompleto() {
     if (window.aircraftMap) {
         if (window.linhasSBUR) {
@@ -75,11 +54,8 @@ function limparMapaCompleto() {
 }
 
 function abrirMapaAeronave(aircraft) {
-    // Se o mapa estava fechado e esta é a primeira abertura, limpa os dados antigos de verdade
-    if (window.mapaFechado) {
-        limparMapaCompleto();
-        window.mapaFechado = false; // Altera o estado para aberto
-    }
+    // 1 e 2. Reseta o estado anterior para que 1 único avião clicado force a aparição da linha de SBUR
+    limparMapaCompleto();
     
     if (!window.aeronavesExibidas) window.aeronavesExibidas = [];
     if (!window.linhasSBUR) window.linhasSBUR = [];
@@ -123,11 +99,6 @@ function abrirMapaAeronave(aircraft) {
             fillOpacity: 0.5,
             weight: 0.5
         }).addTo(window.aircraftMap);
-    }
-
-    // Garante que o marcador não seja duplicado se o avião já estiver na tela
-    if (aircraft.marker && window.aircraftMap.hasLayer(aircraft.marker)) {
-        window.aircraftMap.removeLayer(aircraft.marker);
     }
 
     const rotation = aircraft.rumoMagnetic !== '---' ? parseInt(aircraft.rumoMagnetic) - 22 : 0;
@@ -191,7 +162,7 @@ function abrirMapaAeronave(aircraft) {
             const rumo = parseInt(ac.rumoMagnetic);
             if (isNaN(rumo)) return;
 
-            // Rumo geográfico corrigido usando a declinação magnética para sincronizar com o nariz do avião
+            // 3. Aplica a compensação de -22° no rumo verdadeiro do Turf para bater milimetricamente com o nariz do ícone
             const rumoVerdadeiroCompensado = (rumo - 22 + 360) % 360;
 
             const destino = turf.destination(
@@ -230,8 +201,8 @@ function abrirMapaAeronave(aircraft) {
 }
 
 async function buscarAeronavesProximas() {
-    // Quando uma nova requisição de busca acontece na tabela, assumimos que o fluxo de mapas anterior encerrou
-    window.mapaFechado = true;
+    // Força o mapa a se livrar de qualquer elemento pendente de renderizações/cliques anteriores no início de cada consulta
+    limparMapaCompleto();
 
     const sburLongitude = sbur[0];
     const sburLatitude = sbur[1];
