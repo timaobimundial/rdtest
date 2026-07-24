@@ -571,6 +571,7 @@ async function processarComandoEstimado(aircraft, comando) {
         const rumoMag = parseInt(aircraft.rumoMagnetic);
         if (isNaN(rumoMag)) return;
 
+        // Ajuste exato da declinação magnética (-22°)
         const rumoVerdadeiro = (rumoMag - 22 + 360) % 360;
         
         const pontoProjetado = turf.destination(pontoAviao, 1000, rumoVerdadeiro, { units: 'kilometers' });
