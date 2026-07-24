@@ -277,7 +277,7 @@ async function fetchAeroportoInfo() {
         window.map = null;
     }
 
-    // CRIA NOVO MAPA
+    // CRIA NOVO MAPA kkj
     window.map = L.map('map', {
         scrollWheelZoom: true
     }).setView([sbur.lat, sbur.lng], 5);
@@ -316,26 +316,22 @@ async function fetchAeroportoInfo() {
         }
     ).addTo(window.map);
 
-    const tooltipContent =
-        `SBUR<br>
-        <span style="display:inline-block; width:50%; text-align:left">
-        ${formattedMagneticBearing}º
-        </span>
-        <span style="display:inline-block; width:50%; text-align:right">
-        ${distance}NM
-        </span>`;
+const tooltipContent =
+    `SBUR<br>
+    ${formattedMagneticBearing}º ${distance}NM`;
 
     const markerSBUR =
         L.marker([sbur.lat, sbur.lng]).addTo(window.map);
 
-    markerSBUR.bindTooltip(
-        tooltipContent,
-        {
-            permanent: true,
-            direction: "top",
-            offset: [0, -15]
-        }
-    );
+markerSBUR.bindTooltip(
+    tooltipContent,
+    {
+        permanent: true,
+        direction: "top",
+        offset: [0, -15],
+        className: "tooltip-sbur"
+    }
+);;
 
     const markerDest =
         L.marker([latDest, lngDest]).addTo(window.map);
