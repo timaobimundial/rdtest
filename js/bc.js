@@ -1,7 +1,8 @@
-// Variável global para armazenar os marcadores dos estimados
+// =========================================================
+// VARIÁVEIS E FUNÇÕES DE LIMPEZA DOS ESTIMADOS
+// =========================================================
 window.estimadosMarkers = [];
 
-// Função para limpar os marcadores de estimado da tela
 function limparEstimadosAtuais() {
     if (window.estimadosMarkers && window.aircraftMap) {
         window.estimadosMarkers.forEach(m => window.aircraftMap.removeLayer(m));
@@ -71,6 +72,7 @@ function processAircraftData(data) {
         const point = [longitude, latitude];
         const altitudeInFeet = baroAltitude * 3.28084;
         const FL = altitudeInFeet / 100;
+
         const FLFormatado = 'F' + Math.round(FL).toString().padStart(3, '0');
 
         let speedKts = '---';
@@ -131,7 +133,10 @@ function processAircraftData(data) {
 }
 
 function fetchDataBC() {
-    fetch('https://opensky-network.org/api/states/all?lamin=-20.582222&lomin=-48.906111&lamax=-19.155556&lomax=-46.943611')
+    const targetUrl = 'https://opensky-network.org/api/states/all?lamin=-20.582222&lomin=-48.906111&lamax=-19.155556&lomax=-46.943611';
+    const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
+
+    fetch(proxyUrl)
         .then(response => response.json())
         .then(data => {
             document.getElementById('mensagem-carregamento').style.display = 'none';
@@ -148,15 +153,12 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(fetchDataBC, 10000);
 });
 
-// =========================================================
-// FUNÇÃO DE ABERTURA E RENDERIZAÇÃO DO MAPA DA AERONAVE
-// =========================================================
 function abrirMapaAeronave(aircraft) {
     if (!window.aeronavesExibidas) window.aeronavesExibidas = [];
     if (!window.linhasSBUR) window.linhasSBUR = [];
     if (!window.linhasRumo) window.linhasRumo = [];
     if (!window.estimadosMarkers) window.estimadosMarkers = [];
-    
+
     const jaExiste = window.aeronavesExibidas.some(ac => ac.identifier === aircraft.identifier);
     if (!jaExiste) {
         window.aeronavesExibidas.push(aircraft);
@@ -238,7 +240,7 @@ function abrirMapaAeronave(aircraft) {
     );
 
     // =========================================================
-    // CLIQUE NO ÍCONE DO AVIÃO PARA ABRIR O INPUT FLUTUANTE
+    // EVENTO DE CLIQUE NO ÍCONE DO AVIÃO (INPUT FLUTUANTE)
     // =========================================================
     planeMarker.on('click', function(e) {
         L.DomEvent.stopPropagation(e);
@@ -265,7 +267,6 @@ function abrirMapaAeronave(aircraft) {
             if (elInput) {
                 elInput.focus();
                 
-                // Atualização em tempo real conforme digita/apaga
                 elInput.addEventListener('input', function() {
                     processarComandoEstimado(aircraft, elInput.value.trim().toUpperCase());
                 });
@@ -284,12 +285,14 @@ function abrirMapaAeronave(aircraft) {
     }
 
     const bounds = L.latLngBounds([[sbur[1], sbur[0]]]);
+
     window.aeronavesExibidas.forEach(ac => {
         bounds.extend([ac.latitude, ac.longitude]);
     });
 
     window.linhasSBUR.forEach(linha => window.aircraftMap.removeLayer(linha));
     window.linhasSBUR = [];
+
     window.linhasRumo.forEach(linha => window.aircraftMap.removeLayer(linha));
     window.linhasRumo = [];
 
@@ -305,6 +308,29 @@ function abrirMapaAeronave(aircraft) {
         window.linhasSBUR.push(linhaSBUR);
     });
 
+    window.aeronavesExibidas.forEach(ac => {
+        if (ac.rumoMagnetic !== '---') {
+            const rumoMag = parseInt(ac.rumoMagnetic);
+            const rumoVerdadeiro = (rumoMag - 22 + 360) % 360;
+
+            const pontoOrigem = turf.point([ac.longitude, ac.latitude]);
+            const pontoDestino = turf.destination(pontoOrigem, 100, rumoVerdadeiro, { units: 'kilometers' });
+
+            const coordsLinha = [
+                [ac.latitude, ac.longitude],
+                [pontoDestino.geometry.coordinates[1], pontoDestino.geometry.coordinates[0]]
+            ];
+
+            const linhaRumo = L.polyline(coordsLinha, {
+                color: 'red',
+                weight: 1,
+                dashArray: '4, 4'
+            }).addTo(window.aircraftMap);
+
+            window.linhasRumo.push(linhaRumo);
+        }
+    });
+
     window.aircraftMap.fitBounds(bounds, {
         paddingTopLeft: [90, 90],
         paddingBottomRight: [50, 50]
@@ -316,7 +342,7 @@ function abrirMapaAeronave(aircraft) {
 }
 
 // =========================================================
-// LÓGICA DE PROCESSAMENTO E BUSCA DOS ESTIMADOS
+// LÓGICA DE PROCESSAMENTO E CÁLCULO DOS ESTIMADOS
 // =========================================================
 async function processarComandoEstimado(aircraft, comando) {
     limparEstimadosAtuais();
@@ -335,21 +361,16 @@ async function processarComandoEstimado(aircraft, comando) {
 
     let destLat = null, destLng = null, nomePonto = termo;
 
-    // 1. Caso SBUR local
     if (termo === 'SBUR') {
         destLat = sbur[1];
         destLng = sbur[0];
-    } 
-    // 2. Busca nos FIXES de 5 letras (waypoint.csv)
-    else if (termo.length === 5 && typeof fixes !== 'undefined' && fixes.length > 0) {
+    } else if (termo.length === 5 && typeof fixes !== 'undefined' && fixes.length > 0) {
         const fixEncontrado = fixes.find(f => f.ident === termo);
         if (fixEncontrado) {
             destLat = fixEncontrado.lat;
             destLng = fixEncontrado.lng;
         }
-    } 
-    // 3. Busca em Aeródromos de 4 letras (API AISWEB)
-    else if (termo.length === 4) {
+    } else if (termo.length === 4) {
         try {
             const apiUrl = `https://aisweb.decea.mil.br/api/?apiKey=1505393075&apiPass=1f301b84-0a7c-11ed-9f5b-0050569ac2e1&area=rotaer&icaoCode=${termo}`;
             const response = await fetch(apiUrl);
@@ -386,7 +407,6 @@ async function processarComandoEstimado(aircraft, comando) {
     let distNM = 0;
 
     if (!isTraves) {
-        // CÁLCULO DIRETO
         const pontoDestino = turf.point([destLng, destLat]);
         const distKM = turf.distance(pontoAviao, pontoDestino, { units: 'kilometers' });
         distNM = distKM * 0.539957;
@@ -394,7 +414,6 @@ async function processarComandoEstimado(aircraft, comando) {
         desenharPontoEstimado(destLat, destLng, `${nomePonto}`, distNM, gs);
 
     } else {
-        // CÁLCULO DE TRAVÉS (90°)
         const rumoMag = parseInt(aircraft.rumoMagnetic);
         if (isNaN(rumoMag)) return;
 
