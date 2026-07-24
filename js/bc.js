@@ -8,7 +8,7 @@ const mensagemCarregamento = document.getElementById('mensagem-carregamento');
 const imagemCarregamento = mensagemCarregamento.querySelector('img');
 
 
-const API_URL = "https://project-i7r19.vercel.app/api/bc";
+const API_URL = "https://rdtest-peach.vercel.app/api/bc";
 
 // polígono SBUR
 const polygonCoordinates = [
