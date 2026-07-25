@@ -180,30 +180,55 @@ function abrirMapaAeronave(aircraft) {
         }
         limparEstimadosAtuais();
 
-        // Abre o input para o avião atual
-        const inputHtml = `<input type="text" class="input-estimado-plane" placeholder="Ex: ISRIK" id="input_est_${aircraft.identifier}" style="width: 48px; padding: 2px 4px; font-size: 11px;">`;
+// Abre o input com o botão "X" azul e redondo para fechar
+        const inputHtml = `
+            <div style="position: relative; display: inline-block;">
+                <input type="text" class="input-estimado-plane" placeholder="ISRIK" id="input_est_${aircraft.identifier}" maxlength="5" style="width: 48px; padding: 2px 14px 2px 4px; font-size: 11px; background-color: #ffffff !important; color: #000000 !important; border: 1px solid #ccc; border-radius: 3px; outline: none; box-sizing: border-box;">
+                <button id="btn_clear_${aircraft.identifier}" style="position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; background-color: #007bff; color: white; border: none; border-radius: 50%; font-size: 9px; line-height: 12px; text-align: center; cursor: pointer; padding: 0; display: none; z-index: 9999;">×</button>
+            </div>
+        `;
+
         const inputIcon = L.divIcon({
             className: 'custom-input-container',
             html: inputHtml,
             iconSize: [48, 22],
-            iconAnchor: [24, -2]
+            iconAnchor: [24, 38]
         });
 
         aircraft.inputMarker = L.marker([aircraft.latitude, aircraft.longitude], { icon: inputIcon }).addTo(window.aircraftMap);
 
         setTimeout(() => {
             const elInput = document.getElementById(`input_est_${aircraft.identifier}`);
+            const btnClear = document.getElementById(`btn_clear_${aircraft.identifier}`);
+
             if (elInput) {
                 elInput.focus();
                 
                 elInput.addEventListener('input', function() {
-                    processarComandoEstimado(aircraft, elInput.value.trim().toUpperCase());
+                    const val = elInput.value.trim().toUpperCase();
+                    if (val.length > 0) {
+                        if (btnClear) btnClear.style.display = 'block';
+                    } else {
+                        if (btnClear) btnClear.style.display = 'none';
+                    }
+                    processarComandoEstimado(aircraft, val);
                 });
 
                 elInput.addEventListener('keydown', function(event) {
                     if (event.key === 'Enter') {
                         elInput.blur();
                     }
+                });
+            }
+
+            if (btnClear) {
+                btnClear.addEventListener('click', function(e) {
+                    L.DomEvent.stopPropagation(e);
+                    if (aircraft.inputMarker) {
+                        window.aircraftMap.removeLayer(aircraft.inputMarker);
+                        aircraft.inputMarker = null;
+                    }
+                    limparEstimadosAtuais();
                 });
             }
         }, 100);
@@ -627,7 +652,7 @@ function desenharPontoEstimado(lat, lng, titulo, distNM, gs) {
     const minStr = agora.getMinutes().toString().padStart(2, '0');
     const minDiferencaStr = tempoMinutosTotal.toString().padStart(2, '0');
 
-    const textoEtiqueta = `• ${titulo} +${minDiferencaStr}' ${horasStr}:${minStr}`;
+    const textoEtiqueta = `${titulo} +${minDiferencaStr}' ${horasStr}:${minStr}`;
 
     const iconPonto = L.divIcon({
         className: 'ponto-marcador-icon',
