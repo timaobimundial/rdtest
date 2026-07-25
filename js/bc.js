@@ -192,7 +192,7 @@ function abrirMapaAeronave(aircraft) {
             className: 'custom-input-container',
             html: inputHtml,
             iconSize: [66, 22],
-            iconAnchor: [33, -22]
+            iconAnchor: [10, -22]
         });
 
         aircraft.inputMarker = L.marker([aircraft.latitude, aircraft.longitude], { icon: inputIcon }).addTo(window.aircraftMap);
