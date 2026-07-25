@@ -158,9 +158,10 @@ function abrirMapaAeronave(aircraft) {
     // ==========================================
     // CLIQUE NO AVIÃO DO MAPA (INPUT FLUTUANTE)
     // ==========================================
-    planeMarker.on('click', function(e) {
+  planeMarker.on('click', function(e) {
         L.DomEvent.stopPropagation(e);
 
+        // Se o avião já tinha input aberto, o clique funciona como toggle (fecha)
         if (aircraft.inputMarker) {
             window.aircraftMap.removeLayer(aircraft.inputMarker);
             aircraft.inputMarker = null;
@@ -168,12 +169,24 @@ function abrirMapaAeronave(aircraft) {
             return;
         }
 
-        const inputHtml = `<input type="text" class="input-estimado-plane" placeholder="Ex: ISRIK" id="input_est_${aircraft.identifier}">`;
+        // LIMPEZA: Fecha o input e os estimados de qualquer OUTRO avião ativo
+        if (window.aeronavesExibidas) {
+            window.aeronavesExibidas.forEach(ac => {
+                if (ac.inputMarker) {
+                    window.aircraftMap.removeLayer(ac.inputMarker);
+                    ac.inputMarker = null;
+                }
+            });
+        }
+        limparEstimadosAtuais();
+
+        // Abre o input para o avião atual
+        const inputHtml = `<input type="text" class="input-estimado-plane" placeholder="Ex: ISRIK" id="input_est_${aircraft.identifier}" style="width: 48px; padding: 2px 4px; font-size: 11px;">`;
         const inputIcon = L.divIcon({
             className: 'custom-input-container',
             html: inputHtml,
-            iconSize: [70, 25],
-            iconAnchor: [35, -10]
+            iconSize: [48, 22],
+            iconAnchor: [24, -2]
         });
 
         aircraft.inputMarker = L.marker([aircraft.latitude, aircraft.longitude], { icon: inputIcon }).addTo(window.aircraftMap);
@@ -183,7 +196,6 @@ function abrirMapaAeronave(aircraft) {
             if (elInput) {
                 elInput.focus();
                 
-                // Atualização em tempo real conforme digita ou apaga
                 elInput.addEventListener('input', function() {
                     processarComandoEstimado(aircraft, elInput.value.trim().toUpperCase());
                 });
@@ -506,12 +518,15 @@ async function processarComandoEstimado(aircraft, comando) {
     let isTraves = false;
     let termo = comando;
 
+    // RECURSO DE TRAVÉS ("T ") DESATIVADO TEMPORARIAMENTE
     if (comando.startsWith('T ')) {
-        isTraves = true;
-        termo = comando.substring(2).trim();
+        return; // Anula a execução se tentar usar través
     }
 
     if (!termo) return;
+
+    // Validação: executa apenas para códigos ICAO (4 letras) ou Fixos (5 letras)
+    if (termo.length < 4 || termo.length > 5) return;
 
     let destLat = null, destLng = null, nomePonto = termo;
 
@@ -620,7 +635,7 @@ function desenharPontoEstimado(lat, lng, titulo, distNM, gs) {
         iconAnchor: [4, 4]
     });
 
-    const markerPonto = L.marker([lat, lng], { icon: iconPonto }).addTo(window.aircraftMap);
+const markerPonto = L.marker([lat, lng], { icon: iconPonto }).addTo(window.aircraftMap);
 
     markerPonto.bindTooltip(textoEtiqueta, {
         permanent: true,
@@ -630,4 +645,22 @@ function desenharPontoEstimado(lat, lng, titulo, distNM, gs) {
     });
 
     window.estimadosMarkers.push(markerPonto);
+
+    // Ajusta o zoom do mapa para enquadrar também o ponto estimado gerado
+    if (window.aircraftMap) {
+        const boundsAtual = L.latLngBounds([[sbur[1], sbur[0]]]);
+        
+        // Inclui as aeronaves exibidas
+        if (window.aeronavesExibidas) {
+            window.aeronavesExibidas.forEach(ac => boundsAtual.extend([ac.latitude, ac.longitude]));
+        }
+        
+        // Inclui o novo ponto estimado
+        boundsAtual.extend([lat, lng]);
+
+        window.aircraftMap.fitBounds(boundsAtual, {
+            paddingTopLeft: [90, 90],
+            paddingBottomRight: [50, 50]
+        });
+    }
 }
