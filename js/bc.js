@@ -158,8 +158,14 @@ function abrirMapaAeronave(aircraft) {
     // ==========================================
     // CLIQUE NO AVIÃO DO MAPA (INPUT FLUTUANTE)
     // ==========================================
-  planeMarker.on('click', function(e) {
+planeMarker.on('click', function(e) {
         L.DomEvent.stopPropagation(e);
+
+        // Bloqueia o clique se a aeronave não tiver velocidade informada pela API
+        const gs = parseFloat(aircraft.velocidade);
+        if (isNaN(gs) || gs <= 0 || aircraft.velocidade === '---') {
+            return;
+        }
 
         // Se o avião já tinha input aberto, o clique funciona como toggle (fecha)
         if (aircraft.inputMarker) {
@@ -169,6 +175,12 @@ function abrirMapaAeronave(aircraft) {
             return;
         }
 
+// Desativa o cursor de mãozinha se não tiver velocidade
+    const gs = parseFloat(aircraft.velocidade);
+    if (isNaN(gs) || gs <= 0 || aircraft.velocidade === '---') {
+        planeMarker.getElement().style.cursor = 'default';
+    }
+    
         // LIMPEZA: Fecha o input e os estimados de qualquer OUTRO avião ativo
         if (window.aeronavesExibidas) {
             window.aeronavesExibidas.forEach(ac => {
