@@ -180,19 +180,19 @@ function abrirMapaAeronave(aircraft) {
         }
         limparEstimadosAtuais();
 
-// Abre o input com o botão "X" azul e redondo para fechar
+// Abre o input com o botão "X" azul e redondo posicionado do lado de fora (à direita)
         const inputHtml = `
-            <div style="position: relative; display: inline-block;">
-                <input type="text" class="input-estimado-plane" placeholder="ISRIK" id="input_est_${aircraft.identifier}" maxlength="5" style="width: 48px; padding: 2px 14px 2px 4px; font-size: 11px; background-color: #ffffff !important; color: #000000 !important; border: 1px solid #ccc; border-radius: 3px; outline: none; box-sizing: border-box;">
-                <button id="btn_clear_${aircraft.identifier}" style="position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; background-color: #007bff; color: white; border: none; border-radius: 50%; font-size: 9px; line-height: 12px; text-align: center; cursor: pointer; padding: 0; display: none; z-index: 9999;">×</button>
+            <div style="position: relative; display: inline-flex; align-items: center;">
+                <input type="text" class="input-estimado-plane" placeholder="" id="input_est_${aircraft.identifier}" maxlength="5" style="width: 48px; padding: 2px 4px; font-size: 11px; background-color: #ffffff !important; color: #000000 !important; border: 1px solid #ccc; border-radius: 3px; outline: none; box-sizing: border-box;">
+                <button id="btn_clear_${aircraft.identifier}" style="position: absolute; left: 100%; margin-left: 4px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; background-color: #007bff; color: white; border: none; border-radius: 50%; font-size: 10px; line-height: 14px; text-align: center; cursor: pointer; padding: 0; display: none; z-index: 9999;">×</button>
             </div>
         `;
 
         const inputIcon = L.divIcon({
             className: 'custom-input-container',
             html: inputHtml,
-            iconSize: [48, 22],
-            iconAnchor: [24, -22]
+            iconSize: [66, 22],
+            iconAnchor: [33, -22]
         });
 
         aircraft.inputMarker = L.marker([aircraft.latitude, aircraft.longitude], { icon: inputIcon }).addTo(window.aircraftMap);
