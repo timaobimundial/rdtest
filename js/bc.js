@@ -541,14 +541,7 @@ async function processarComandoEstimado(aircraft, comando) {
 
     if (!comando) return;
 
-    let isTraves = false;
-    let termo = comando;
-
-    // RECURSO DE TRAVÉS ("T ") DESATIVADO TEMPORARIAMENTE
-    if (comando.startsWith('T ')) {
-        return; // Anula a execução se tentar usar través
-    }
-
+    let termo = comando.trim().toUpperCase();
     if (!termo) return;
 
     // Validação: executa apenas para códigos ICAO (4 letras) ou Fixos (5 letras)
@@ -598,95 +591,44 @@ async function processarComandoEstimado(aircraft, comando) {
     const gs = parseFloat(aircraft.velocidade);
     if (isNaN(gs) || gs <= 0) return;
 
+    // 1. CÁLCULO DO FIXO/AERÓDROMO (PONTO PRETO)
     const pontoAviao = turf.point([aircraft.longitude, aircraft.latitude]);
-    let distNM = 0;
+    const pontoDestino = turf.point([destLng, destLat]);
+    
+    const distFixoKM = turf.distance(pontoAviao, pontoDestino, { units: 'kilometers' });
+    const distFixoNM = distFixoKM * 0.539957;
 
-    if (!isTraves) {
-        const pontoDestino = turf.point([destLng, destLat]);
-        const distKM = turf.distance(pontoAviao, pontoDestino, { units: 'kilometers' });
-        distNM = distKM * 0.539957;
+    // 2. CÁLCULO DO TRAVÉS (PONTO CINZA NA ROTA)
+    const rumoMag = parseInt(aircraft.rumoMagnetic);
+    let latTraves = null, lngTraves = null, distTravesNM = null;
 
-        desenharPontoEstimado(destLat, destLng, `${nomePonto}`, distNM, gs);
-
-    } else {
-        const rumoMag = parseInt(aircraft.rumoMagnetic);
-        if (isNaN(rumoMag)) return;
-
-        // Ajuste exato da declinação magnética (-22°)
+    if (!isNaN(rumoMag)) {
         const rumoVerdadeiro = (rumoMag - 22 + 360) % 360;
         
         const pontoProjetado = turf.destination(pontoAviao, 1000, rumoVerdadeiro, { units: 'kilometers' });
         const linhaVoo = turf.lineString([[aircraft.longitude, aircraft.latitude], pontoProjetado.geometry.coordinates]);
         
-        const pontoRef = turf.point([destLng, destLat]);
-        const pontoTraves = turf.nearestPointOnLine(linhaVoo, pontoRef);
+        const pontoTraves = turf.nearestPointOnLine(linhaVoo, pontoDestino);
 
-        const lngFinal = pontoTraves.geometry.coordinates[0];
-        const latFinal = pontoTraves.geometry.coordinates[1];
+        lngTraves = pontoTraves.geometry.coordinates[0];
+        latTraves = pontoTraves.geometry.coordinates[1];
 
-        const distKM = turf.distance(pontoAviao, pontoTraves, { units: 'kilometers' });
-        distNM = distKM * 0.539957;
-
-        desenharSimplesPonto(destLat, destLng);
-        desenharPontoEstimado(latFinal, lngFinal, `TRAVÉS ${nomePonto}`, distNM, gs);
+        const distTravesKM = turf.distance(pontoAviao, pontoTraves, { units: 'kilometers' });
+        distTravesNM = distTravesKM * 0.539957;
     }
+
+    desenharCenarioEstimado(destLat, destLng, nomePonto, distFixoNM, latTraves, lngTraves, distTravesNM, gs);
 }
 
-function desenharSimplesPonto(lat, lng) {
-    const iconPonto = L.divIcon({
+function desenharCenarioEstimado(latFixo, lngFixo, nomePonto, distFixoNM, latTraves, lngTraves, distTravesNM, gs) {
+    // 1. DADOS DO FIXO (PONTO PRETO)
+    const tempoHorasFixo = distFixoNM / gs;
+    const minFixo = Math.round(tempoHorasFixo * 60);
+    const agoraFixo = new Date();
+    agoraFixo.setMinutes(agoraFixo.getMinutes() + minFixo);
+    const horaFixoStr = `${agoraFixo.getHours().toString().padStart(2, '0')}:${agoraFixo.getMinutes().toString().padStart(2, '0')}`;
+    const textoFixo = `${nomePonto} +${minFixo.toString().padStart(2, '0')}' ${horaFixoStr}`;
+
+    const iconFixo = L.divIcon({
         className: 'ponto-marcador-icon',
-        iconSize: [8, 8],
-        iconAnchor: [4, 4]
-    });
-    const m = L.marker([lat, lng], { icon: iconPonto }).addTo(window.aircraftMap);
-    window.estimadosMarkers.push(m);
-}
-
-function desenharPontoEstimado(lat, lng, titulo, distNM, gs) {
-    const tempoHoras = distNM / gs;
-    const tempoMinutosTotal = Math.round(tempoHoras * 60);
-
-    const agora = new Date();
-    agora.setMinutes(agora.getMinutes() + tempoMinutosTotal);
-
-    const horasStr = agora.getHours().toString().padStart(2, '0');
-    const minStr = agora.getMinutes().toString().padStart(2, '0');
-    const minDiferencaStr = tempoMinutosTotal.toString().padStart(2, '0');
-
-    const textoEtiqueta = `${titulo}  +${minDiferencaStr}'  ${horasStr}:${minStr}`;
-
-    const iconPonto = L.divIcon({
-        className: 'ponto-marcador-icon',
-        iconSize: [8, 8],
-        iconAnchor: [4, 4]
-    });
-
-const markerPonto = L.marker([lat, lng], { icon: iconPonto }).addTo(window.aircraftMap);
-
-    markerPonto.bindTooltip(textoEtiqueta, {
-        permanent: true,
-        direction: "right",
-        offset: [10, 0],
-        className: "tooltip-estimado-resultado"
-    });
-
-    window.estimadosMarkers.push(markerPonto);
-
-    // Ajusta o zoom do mapa para enquadrar também o ponto estimado gerado
-    if (window.aircraftMap) {
-        const boundsAtual = L.latLngBounds([[sbur[1], sbur[0]]]);
-        
-        // Inclui as aeronaves exibidas
-        if (window.aeronavesExibidas) {
-            window.aeronavesExibidas.forEach(ac => boundsAtual.extend([ac.latitude, ac.longitude]));
-        }
-        
-        // Inclui o novo ponto estimado
-        boundsAtual.extend([lat, lng]);
-
-        window.aircraftMap.fitBounds(boundsAtual, {
-            paddingTopLeft: [90, 90],
-            paddingBottomRight: [50, 50]
-        });
-    }
-}
+        iconSize:
