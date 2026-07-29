@@ -544,7 +544,6 @@ async function processarComandoEstimado(aircraft, comando) {
     let termo = comando.trim().toUpperCase();
     if (!termo) return;
 
-    // Validação: executa apenas para códigos ICAO (4 letras) ou Fixos (5 letras)
     if (termo.length < 4 || termo.length > 5) return;
 
     let destLat = null, destLng = null, nomePonto = termo;
@@ -591,37 +590,44 @@ async function processarComandoEstimado(aircraft, comando) {
     const gs = parseFloat(aircraft.velocidade);
     if (isNaN(gs) || gs <= 0) return;
 
-    // 1. CÁLCULO DO FIXO/AERÓDROMO (PONTO PRETO)
     const pontoAviao = turf.point([aircraft.longitude, aircraft.latitude]);
     const pontoDestino = turf.point([destLng, destLat]);
-    
+
+    // 1. CÁLCULO DO FIXO/AERÓDROMO
     const distFixoKM = turf.distance(pontoAviao, pontoDestino, { units: 'kilometers' });
     const distFixoNM = distFixoKM * 0.539957;
 
-    // 2. CÁLCULO DO TRAVÉS (PONTO CINZA NA ROTA)
+    // 2. CÁLCULO DO TRAVÉS (Perpendicular à rota do avião)
     const rumoMag = parseInt(aircraft.rumoMagnetic);
     let latTraves = null, lngTraves = null, distTravesNM = null;
 
+    let rumoVooVerdadeiro = null;
     if (!isNaN(rumoMag)) {
-        const rumoVerdadeiro = (rumoMag - 22 + 360) % 360;
-        
-        const pontoProjetado = turf.destination(pontoAviao, 1000, rumoVerdadeiro, { units: 'kilometers' });
-        const linhaVoo = turf.lineString([[aircraft.longitude, aircraft.latitude], pontoProjetado.geometry.coordinates]);
-        
-        const pontoTraves = turf.nearestPointOnLine(linhaVoo, pontoDestino);
-
-        lngTraves = pontoTraves.geometry.coordinates[0];
-        latTraves = pontoTraves.geometry.coordinates[1];
-
-        const distTravesKM = turf.distance(pontoAviao, pontoTraves, { units: 'kilometers' });
-        distTravesNM = distTravesKM * 0.539957;
+        rumoVooVerdadeiro = (rumoMag - 22 + 360) % 360;
+    } else {
+        // Se a aeronave não tiver rumo magnético válido, usa a linha direta até SBUR
+        const pontoSBUR = turf.point([sbur[0], sbur[1]]);
+        rumoVooVerdadeiro = turf.bearing(pontoAviao, pontoSBUR);
     }
+
+    // Projeta a linha de voo a partir da aeronave
+    const pontoProjetado = turf.destination(pontoAviao, 1000, rumoVooVerdadeiro, { units: 'kilometers' });
+    const linhaVoo = turf.lineString([[aircraft.longitude, aircraft.latitude], pontoProjetado.geometry.coordinates]);
+
+    // Encontra o ponto de através na linha de voo
+    const pontoTraves = turf.nearestPointOnLine(linhaVoo, pontoDestino);
+
+    lngTraves = pontoTraves.geometry.coordinates[0];
+    latTraves = pontoTraves.geometry.coordinates[1];
+
+    const distTravesKM = turf.distance(pontoAviao, pontoTraves, { units: 'kilometers' });
+    distTravesNM = distTravesKM * 0.539957;
 
     desenharCenarioEstimado(destLat, destLng, nomePonto, distFixoNM, latTraves, lngTraves, distTravesNM, gs);
 }
 
 function desenharCenarioEstimado(latFixo, lngFixo, nomePonto, distFixoNM, latTraves, lngTraves, distTravesNM, gs) {
-    // 1. DADOS DO FIXO (PONTO PRETO)
+    // 1. MARCANDO O FIXO / AERÓDROMO (PONTO PRETO)
     const tempoHorasFixo = distFixoNM / gs;
     const minFixo = Math.round(tempoHorasFixo * 60);
     const agoraFixo = new Date();
@@ -644,7 +650,7 @@ function desenharCenarioEstimado(latFixo, lngFixo, nomePonto, distFixoNM, latTra
     });
     window.estimadosMarkers.push(markerFixo);
 
-    // 2. DADOS DO TRAVÉS (PONTO CINZA)
+    // 2. MARCANDO O TRAVÉS NA ROTA (PONTO CINZA COM VISIBILIDADE PERMANENTE)
     if (latTraves !== null && lngTraves !== null) {
         const tempoHorasTraves = distTravesNM / gs;
         const minTraves = Math.round(tempoHorasTraves * 60);
@@ -655,28 +661,19 @@ function desenharCenarioEstimado(latFixo, lngFixo, nomePonto, distFixoNM, latTra
 
         const iconTraves = L.divIcon({
             className: 'ponto-traves-icon',
-            html: '<div style="width:8px; height:8px; background-color:#808080; border-radius:50%;"></div>',
+            html: '<div style="width:8px; height:8px; background-color:#808080; border-radius:50%; border:1px solid #000;"></div>',
             iconSize: [8, 8],
             iconAnchor: [4, 4]
         });
 
         const markerTraves = L.marker([latTraves, lngTraves], { icon: iconTraves }).addTo(window.aircraftMap);
+        
+        // Exibição PERMANENTE do estimador de através
         markerTraves.bindTooltip(textoTraves, {
-            permanent: false,
-            direction: "right",
-            offset: [10, 0],
+            permanent: true,
+            direction: "left",
+            offset: [-10, 0],
             className: "tooltip-estimado-resultado"
-        });
-
-        // Eventos HOVER e MOUSEOUT para alternar o tooltip
-        markerTraves.on('mouseover', function () {
-            markerFixo.closeTooltip();
-            markerTraves.openTooltip();
-        });
-
-        markerTraves.on('mouseout', function () {
-            markerTraves.closeTooltip();
-            markerFixo.openTooltip();
         });
 
         window.estimadosMarkers.push(markerTraves);
