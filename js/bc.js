@@ -631,4 +631,69 @@ function desenharCenarioEstimado(latFixo, lngFixo, nomePonto, distFixoNM, latTra
 
     const iconFixo = L.divIcon({
         className: 'ponto-marcador-icon',
-        iconSize:
+        iconSize: [8, 8],
+        iconAnchor: [4, 4]
+    });
+
+    const markerFixo = L.marker([latFixo, lngFixo], { icon: iconFixo }).addTo(window.aircraftMap);
+    markerFixo.bindTooltip(textoFixo, {
+        permanent: true,
+        direction: "right",
+        offset: [10, 0],
+        className: "tooltip-estimado-resultado"
+    });
+    window.estimadosMarkers.push(markerFixo);
+
+    // 2. DADOS DO TRAVÉS (PONTO CINZA)
+    if (latTraves !== null && lngTraves !== null) {
+        const tempoHorasTraves = distTravesNM / gs;
+        const minTraves = Math.round(tempoHorasTraves * 60);
+        const agoraTraves = new Date();
+        agoraTraves.setMinutes(agoraTraves.getMinutes() + minTraves);
+        const horaTravesStr = `${agoraTraves.getHours().toString().padStart(2, '0')}:${agoraTraves.getMinutes().toString().padStart(2, '0')}`;
+        const textoTraves = `TRAVÉS +${minTraves.toString().padStart(2, '0')}' ${horaTravesStr}`;
+
+        const iconTraves = L.divIcon({
+            className: 'ponto-traves-icon',
+            html: '<div style="width:8px; height:8px; background-color:#808080; border-radius:50%;"></div>',
+            iconSize: [8, 8],
+            iconAnchor: [4, 4]
+        });
+
+        const markerTraves = L.marker([latTraves, lngTraves], { icon: iconTraves }).addTo(window.aircraftMap);
+        markerTraves.bindTooltip(textoTraves, {
+            permanent: false,
+            direction: "right",
+            offset: [10, 0],
+            className: "tooltip-estimado-resultado"
+        });
+
+        // Eventos HOVER e MOUSEOUT para alternar o tooltip
+        markerTraves.on('mouseover', function () {
+            markerFixo.closeTooltip();
+            markerTraves.openTooltip();
+        });
+
+        markerTraves.on('mouseout', function () {
+            markerTraves.closeTooltip();
+            markerFixo.openTooltip();
+        });
+
+        window.estimadosMarkers.push(markerTraves);
+    }
+
+    if (window.aircraftMap) {
+        const boundsAtual = L.latLngBounds([[sbur[1], sbur[0]]]);
+        
+        if (window.aeronavesExibidas) {
+            window.aeronavesExibidas.forEach(ac => boundsAtual.extend([ac.latitude, ac.longitude]));
+        }
+        boundsAtual.extend([latFixo, lngFixo]);
+        if (latTraves !== null) boundsAtual.extend([latTraves, lngTraves]);
+
+        window.aircraftMap.fitBounds(boundsAtual, {
+            paddingTopLeft: [90, 90],
+            paddingBottomRight: [50, 50]
+        });
+    }
+}
