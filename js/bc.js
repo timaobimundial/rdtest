@@ -593,41 +593,38 @@ async function processarComandoEstimado(aircraft, comando) {
     const pontoAviao = turf.point([aircraft.longitude, aircraft.latitude]);
     const pontoDestino = turf.point([destLng, destLat]);
 
-    // 1. CÁLCULO DO FIXO/AERÓDROMO (PONTO PRETO)
+    // 1. CÁLCULO DO FIXO/AERÓDROMO SOLICITADO (PONTO PRETO)
     const distFixoKM = turf.distance(pontoAviao, pontoDestino, { units: 'kilometers' });
     const distFixoNM = distFixoKM * 0.539957;
 
-    // 2. CÁLCULO DO TRAVÉS (PONTO PERPENDICULAR NA LINHA DE VOO DO AVIÃO)
-    const rumoMag = parseInt(aircraft.rumoMagnetic);
+    // 2. CÁLCULO DO TRAVÉS BASEADO NO RUMO MAGNÉTICO (RM) DA AERONAVE
     let latTraves = null, lngTraves = null, distTravesNM = null;
 
-    let rumoVooVerdadeiro = null;
+    const rumoMag = parseInt(aircraft.rumoMagnetic);
     if (!isNaN(rumoMag)) {
-        rumoVooVerdadeiro = (rumoMag - 22 + 360) % 360;
-    } else {
-        const pontoSBUR = turf.point([sbur[0], sbur[1]]);
-        rumoVooVerdadeiro = turf.bearing(pontoAviao, pontoSBUR);
+        // Converte o Rumo Magnético em Rumo Verdadeiro (Declinação regional ~ 22° W)
+        const rumoVerdadeiro = (rumoMag - 22 + 360) % 360;
+
+        // Projeta a linha de trajetória exata para trás e para a frente baseada no RM do avião
+        const pontoAtras = turf.destination(pontoAviao, 1000, (rumoVerdadeiro + 180) % 360, { units: 'kilometers' });
+        const pontoFrente = turf.destination(pontoAviao, 1000, rumoVerdadeiro, { units: 'kilometers' });
+        const linhaTrajetoriaRM = turf.lineString([pontoAtras.geometry.coordinates, pontoFrente.geometry.coordinates]);
+
+        // O través é a projeção perpendicular (90°) do fixo desejado sobre a linha de rumo da aeronave
+        const pontoTraves = turf.nearestPointOnLine(linhaTrajetoriaRM, pontoDestino);
+
+        lngTraves = pontoTraves.geometry.coordinates[0];
+        latTraves = pontoTraves.geometry.coordinates[1];
+
+        const distTravesKM = turf.distance(pontoAviao, pontoTraves, { units: 'kilometers' });
+        distTravesNM = distTravesKM * 0.539957;
     }
-
-    // Criamos uma linha contínua de voo estendida para trás e para frente da posição atual da aeronave
-    const pontoAtras = turf.destination(pontoAviao, 500, (rumoVooVerdadeiro + 180) % 360, { units: 'kilometers' });
-    const pontoFrente = turf.destination(pontoAviao, 1000, rumoVooVerdadeiro, { units: 'kilometers' });
-    const linhaVoo = turf.lineString([pontoAtras.geometry.coordinates, pontoFrente.geometry.coordinates]);
-
-    // O ponto de través é a interseção perpendicular exata da estação/fixo com a linha de voo
-    const pontoTraves = turf.nearestPointOnLine(linhaVoo, pontoDestino);
-
-    lngTraves = pontoTraves.geometry.coordinates[0];
-    latTraves = pontoTraves.geometry.coordinates[1];
-
-    const distTravesKM = turf.distance(pontoAviao, pontoTraves, { units: 'kilometers' });
-    distTravesNM = distTravesKM * 0.539957;
 
     desenharCenarioEstimado(destLat, destLng, nomePonto, distFixoNM, latTraves, lngTraves, distTravesNM, gs);
 }
 
 function desenharCenarioEstimado(latFixo, lngFixo, nomePonto, distFixoNM, latTraves, lngTraves, distTravesNM, gs) {
-    // 1. DADOS DO FIXO (PONTO PRETO COM TOOLTIP PERMANENTE)
+    // 1. DADOS DO FIXO/AERÓDROMO (PONTO PRETO COM TOOLTIP PERMANENTE)
     const tempoHorasFixo = distFixoNM / gs;
     const minFixo = Math.round(tempoHorasFixo * 60);
     const agoraFixo = new Date();
@@ -642,6 +639,7 @@ function desenharCenarioEstimado(latFixo, lngFixo, nomePonto, distFixoNM, latTra
     });
 
     const markerFixo = L.marker([latFixo, lngFixo], { icon: iconFixo }).addTo(window.aircraftMap);
+    
     markerFixo.bindTooltip(textoFixo, {
         permanent: true,
         direction: "right",
@@ -650,7 +648,7 @@ function desenharCenarioEstimado(latFixo, lngFixo, nomePonto, distFixoNM, latTra
     });
     window.estimadosMarkers.push(markerFixo);
 
-    // 2. DADOS DO TRAVÉS (PONTO CINZA NA ROTA - TOOLTIP APENAS NO HOVER)
+    // 2. DADOS DO TRAVÉS (PONTO CINZA NA TRAJETÓRIA DO RM - TOOLTIP APENAS NO HOVER)
     if (latTraves !== null && lngTraves !== null) {
         const tempoHorasTraves = distTravesNM / gs;
         const minTraves = Math.round(tempoHorasTraves * 60);
@@ -661,19 +659,28 @@ function desenharCenarioEstimado(latFixo, lngFixo, nomePonto, distFixoNM, latTra
 
         const iconTraves = L.divIcon({
             className: 'ponto-traves-icon',
-            html: '<div style="width:8px; height:8px; background-color:#808080; border-radius:50%; border:1px solid #333;"></div>',
-            iconSize: [8, 8],
-            iconAnchor: [4, 4]
+            html: '<div style="width:10px; height:10px; background-color:#808080; border-radius:50%; border:1px solid #000;"></div>',
+            iconSize: [10, 10],
+            iconAnchor: [5, 5]
         });
 
         const markerTraves = L.marker([latTraves, lngTraves], { icon: iconTraves }).addTo(window.aircraftMap);
         
-        // Tooltip aparece apenas ao passar o mouse sobre o ponto de través
+        // Tooltip do través só aparece no HOVER
         markerTraves.bindTooltip(textoTraves, {
             permanent: false,
             direction: "top",
             offset: [0, -10],
             className: "tooltip-estimado-resultado"
+        });
+
+        // Oculta o tooltip do fixo principal quando passar o mouse sobre o através
+        markerTraves.on('mouseover', function () {
+            markerFixo.closeTooltip();
+        });
+
+        markerTraves.on('mouseout', function () {
+            markerFixo.openTooltip();
         });
 
         window.estimadosMarkers.push(markerTraves);
