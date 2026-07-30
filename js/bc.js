@@ -541,9 +541,17 @@ async function processarComandoEstimado(aircraft, comando) {
 
     if (!comando) return;
 
-    let termo = comando.trim().toUpperCase();
+    let isTraves = false;
+    let termo = comando;
+
+    // RECURSO DE TRAVÉS ("T ") DESATIVADO TEMPORARIAMENTE
+    if (comando.startsWith('T ')) {
+        return; // Anula a execução se tentar usar través
+    }
+
     if (!termo) return;
 
+    // Validação: executa apenas para códigos ICAO (4 letras) ou Fixos (5 letras)
     if (termo.length < 4 || termo.length > 5) return;
 
     let destLat = null, destLng = null, nomePonto = termo;
@@ -591,109 +599,90 @@ async function processarComandoEstimado(aircraft, comando) {
     if (isNaN(gs) || gs <= 0) return;
 
     const pontoAviao = turf.point([aircraft.longitude, aircraft.latitude]);
-    const pontoDestino = turf.point([destLng, destLat]);
+    let distNM = 0;
 
-    // 1. CÁLCULO DO FIXO/AERÓDROMO SOLICITADO (PONTO PRETO)
-    const distFixoKM = turf.distance(pontoAviao, pontoDestino, { units: 'kilometers' });
-    const distFixoNM = distFixoKM * 0.539957;
+    if (!isTraves) {
+        const pontoDestino = turf.point([destLng, destLat]);
+        const distKM = turf.distance(pontoAviao, pontoDestino, { units: 'kilometers' });
+        distNM = distKM * 0.539957;
 
-    // 2. CÁLCULO DO TRAVÉS BASEADO NO RUMO MAGNÉTICO (RM) DA AERONAVE
-    let latTraves = null, lngTraves = null, distTravesNM = null;
+        desenharPontoEstimado(destLat, destLng, `${nomePonto}`, distNM, gs);
 
-    const rumoMag = parseInt(aircraft.rumoMagnetic);
-    if (!isNaN(rumoMag)) {
-        // Converte o Rumo Magnético em Rumo Verdadeiro (Declinação regional ~ 22° W)
+    } else {
+        const rumoMag = parseInt(aircraft.rumoMagnetic);
+        if (isNaN(rumoMag)) return;
+
+        // Ajuste exato da declinação magnética (-22°)
         const rumoVerdadeiro = (rumoMag - 22 + 360) % 360;
+        
+        const pontoProjetado = turf.destination(pontoAviao, 1000, rumoVerdadeiro, { units: 'kilometers' });
+        const linhaVoo = turf.lineString([[aircraft.longitude, aircraft.latitude], pontoProjetado.geometry.coordinates]);
+        
+        const pontoRef = turf.point([destLng, destLat]);
+        const pontoTraves = turf.nearestPointOnLine(linhaVoo, pontoRef);
 
-        // Projeta a linha de trajetória exata para trás e para a frente baseada no RM do avião
-        const pontoAtras = turf.destination(pontoAviao, 1000, (rumoVerdadeiro + 180) % 360, { units: 'kilometers' });
-        const pontoFrente = turf.destination(pontoAviao, 1000, rumoVerdadeiro, { units: 'kilometers' });
-        const linhaTrajetoriaRM = turf.lineString([pontoAtras.geometry.coordinates, pontoFrente.geometry.coordinates]);
+        const lngFinal = pontoTraves.geometry.coordinates[0];
+        const latFinal = pontoTraves.geometry.coordinates[1];
 
-        // O través é a projeção perpendicular (90°) do fixo desejado sobre a linha de rumo da aeronave
-        const pontoTraves = turf.nearestPointOnLine(linhaTrajetoriaRM, pontoDestino);
+        const distKM = turf.distance(pontoAviao, pontoTraves, { units: 'kilometers' });
+        distNM = distKM * 0.539957;
 
-        lngTraves = pontoTraves.geometry.coordinates[0];
-        latTraves = pontoTraves.geometry.coordinates[1];
-
-        const distTravesKM = turf.distance(pontoAviao, pontoTraves, { units: 'kilometers' });
-        distTravesNM = distTravesKM * 0.539957;
+        desenharSimplesPonto(destLat, destLng);
+        desenharPontoEstimado(latFinal, lngFinal, `TRAVÉS ${nomePonto}`, distNM, gs);
     }
-
-    desenharCenarioEstimado(destLat, destLng, nomePonto, distFixoNM, latTraves, lngTraves, distTravesNM, gs);
 }
 
-function desenharCenarioEstimado(latFixo, lngFixo, nomePonto, distFixoNM, latTraves, lngTraves, distTravesNM, gs) {
-    // 1. DADOS DO FIXO/AERÓDROMO (PONTO PRETO COM TOOLTIP PERMANENTE)
-    const tempoHorasFixo = distFixoNM / gs;
-    const minFixo = Math.round(tempoHorasFixo * 60);
-    const agoraFixo = new Date();
-    agoraFixo.setMinutes(agoraFixo.getMinutes() + minFixo);
-    const horaFixoStr = `${agoraFixo.getHours().toString().padStart(2, '0')}:${agoraFixo.getMinutes().toString().padStart(2, '0')}`;
-    const textoFixo = `${nomePonto} +${minFixo.toString().padStart(2, '0')}' ${horaFixoStr}`;
+function desenharSimplesPonto(lat, lng) {
+    const iconPonto = L.divIcon({
+        className: 'ponto-marcador-icon',
+        iconSize: [8, 8],
+        iconAnchor: [4, 4]
+    });
+    const m = L.marker([lat, lng], { icon: iconPonto }).addTo(window.aircraftMap);
+    window.estimadosMarkers.push(m);
+}
 
-    const iconFixo = L.divIcon({
+function desenharPontoEstimado(lat, lng, titulo, distNM, gs) {
+    const tempoHoras = distNM / gs;
+    const tempoMinutosTotal = Math.round(tempoHoras * 60);
+
+    const agora = new Date();
+    agora.setMinutes(agora.getMinutes() + tempoMinutosTotal);
+
+    const horasStr = agora.getHours().toString().padStart(2, '0');
+    const minStr = agora.getMinutes().toString().padStart(2, '0');
+    const minDiferencaStr = tempoMinutosTotal.toString().padStart(2, '0');
+
+    const textoEtiqueta = `${titulo}  +${minDiferencaStr}'  ${horasStr}:${minStr}`;
+
+    const iconPonto = L.divIcon({
         className: 'ponto-marcador-icon',
         iconSize: [8, 8],
         iconAnchor: [4, 4]
     });
 
-    const markerFixo = L.marker([latFixo, lngFixo], { icon: iconFixo }).addTo(window.aircraftMap);
-    
-    markerFixo.bindTooltip(textoFixo, {
+const markerPonto = L.marker([lat, lng], { icon: iconPonto }).addTo(window.aircraftMap);
+
+    markerPonto.bindTooltip(textoEtiqueta, {
         permanent: true,
         direction: "right",
         offset: [10, 0],
         className: "tooltip-estimado-resultado"
     });
-    window.estimadosMarkers.push(markerFixo);
 
-    // 2. DADOS DO TRAVÉS (PONTO CINZA NA TRAJETÓRIA DO RM - TOOLTIP APENAS NO HOVER)
-    if (latTraves !== null && lngTraves !== null) {
-        const tempoHorasTraves = distTravesNM / gs;
-        const minTraves = Math.round(tempoHorasTraves * 60);
-        const agoraTraves = new Date();
-        agoraTraves.setMinutes(agoraTraves.getMinutes() + minTraves);
-        const horaTravesStr = `${agoraTraves.getHours().toString().padStart(2, '0')}:${agoraTraves.getMinutes().toString().padStart(2, '0')}`;
-        const textoTraves = `TRAVÉS ${nomePonto} +${minTraves.toString().padStart(2, '0')}' ${horaTravesStr}`;
+    window.estimadosMarkers.push(markerPonto);
 
-        const iconTraves = L.divIcon({
-            className: 'ponto-traves-icon',
-            html: '<div style="width:10px; height:10px; background-color:#808080; border-radius:50%; border:1px solid #000;"></div>',
-            iconSize: [10, 10],
-            iconAnchor: [5, 5]
-        });
-
-        const markerTraves = L.marker([latTraves, lngTraves], { icon: iconTraves }).addTo(window.aircraftMap);
-        
-        // Tooltip do través só aparece no HOVER
-        markerTraves.bindTooltip(textoTraves, {
-            permanent: false,
-            direction: "top",
-            offset: [0, -10],
-            className: "tooltip-estimado-resultado"
-        });
-
-        // Oculta o tooltip do fixo principal quando passar o mouse sobre o através
-        markerTraves.on('mouseover', function () {
-            markerFixo.closeTooltip();
-        });
-
-        markerTraves.on('mouseout', function () {
-            markerFixo.openTooltip();
-        });
-
-        window.estimadosMarkers.push(markerTraves);
-    }
-
+    // Ajusta o zoom do mapa para enquadrar também o ponto estimado gerado
     if (window.aircraftMap) {
         const boundsAtual = L.latLngBounds([[sbur[1], sbur[0]]]);
         
+        // Inclui as aeronaves exibidas
         if (window.aeronavesExibidas) {
             window.aeronavesExibidas.forEach(ac => boundsAtual.extend([ac.latitude, ac.longitude]));
         }
-        boundsAtual.extend([latFixo, lngFixo]);
-        if (latTraves !== null) boundsAtual.extend([latTraves, lngTraves]);
+        
+        // Inclui o novo ponto estimado
+        boundsAtual.extend([lat, lng]);
 
         window.aircraftMap.fitBounds(boundsAtual, {
             paddingTopLeft: [90, 90],
