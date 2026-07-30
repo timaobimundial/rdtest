@@ -683,6 +683,68 @@ $(document).ready(function(){
 
     
 
+
+
+
+<script>
+  (function () {
+    const TEMPO_INDEX_MS = 180000; // 180s para a página normal
+    const TEMPO_MAPA_MS = 90000;    // 90s a partir do momento que o mapa abre
+    
+    let timerRefresh = null;
+    let mapaJaGatilhado = false;
+
+    // 1. Inicia o timer inicial de 180s da página
+    function agendarRefresh(ms) {
+      if (timerRefresh) clearTimeout(timerRefresh);
+      timerRefresh = setTimeout(() => {
+        window.location.reload();
+      }, ms);
+    }
+
+    // Começa com os 180s assim que entra no site
+    agendarRefresh(TEMPO_INDEX_MS);
+
+    // 2. Função de checagem precisa do estado do mapa
+    function checarEAtivarGatilhoMapa() {
+      if (mapaJaGatilhado) return;
+
+      const mapElement = document.getElementById('map');
+      if (!mapElement) return;
+
+      // Verifica se a div está visível (display !== 'none') OU se o Leaflet já injetou suas classes de mapa ativo
+      const estilo = window.getComputedStyle(mapElement);
+      const estaVisivel = estilo.display !== 'none' && estilo.visibility !== 'hidden';
+      const temClasseLeaflet = mapElement.classList.contains('leaflet-container');
+
+      if (estaVisivel || temClasseLeaflet) {
+        mapaJaGatilhado = true; // Impede que o gatilho rode mais de uma vez
+        agendarRefresh(TEMPO_MAPA_MS); // Zera o timer de 180s e inicia o NOVO de 90s
+      }
+    }
+
+    // 3. Monitora o DOM especificamente aguardando a exibição da div do mapa
+    const observer = new MutationObserver(() => {
+      checarEAtivarGatilhoMapa();
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const targetNode = document.getElementById('map') || document.body;
+      observer.observe(targetNode, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+        attributeFilter: ['style', 'class']
+      });
+    });
+  })();
+</script>
+
+
+
+
+
+	
     
 </body>
 </html>
