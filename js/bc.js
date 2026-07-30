@@ -593,11 +593,11 @@ async function processarComandoEstimado(aircraft, comando) {
     const pontoAviao = turf.point([aircraft.longitude, aircraft.latitude]);
     const pontoDestino = turf.point([destLng, destLat]);
 
-    // 1. CÁLCULO DO FIXO/AERÓDROMO
+    // 1. CÁLCULO DO FIXO/AERÓDROMO (PONTO PRETO)
     const distFixoKM = turf.distance(pontoAviao, pontoDestino, { units: 'kilometers' });
     const distFixoNM = distFixoKM * 0.539957;
 
-    // 2. CÁLCULO DO TRAVÉS (Perpendicular à rota do avião)
+    // 2. CÁLCULO DO TRAVÉS (PONTO PERPENDICULAR NA LINHA DE VOO DO AVIÃO)
     const rumoMag = parseInt(aircraft.rumoMagnetic);
     let latTraves = null, lngTraves = null, distTravesNM = null;
 
@@ -605,16 +605,16 @@ async function processarComandoEstimado(aircraft, comando) {
     if (!isNaN(rumoMag)) {
         rumoVooVerdadeiro = (rumoMag - 22 + 360) % 360;
     } else {
-        // Se a aeronave não tiver rumo magnético válido, usa a linha direta até SBUR
         const pontoSBUR = turf.point([sbur[0], sbur[1]]);
         rumoVooVerdadeiro = turf.bearing(pontoAviao, pontoSBUR);
     }
 
-    // Projeta a linha de voo a partir da aeronave
-    const pontoProjetado = turf.destination(pontoAviao, 1000, rumoVooVerdadeiro, { units: 'kilometers' });
-    const linhaVoo = turf.lineString([[aircraft.longitude, aircraft.latitude], pontoProjetado.geometry.coordinates]);
+    // Criamos uma linha contínua de voo estendida para trás e para frente da posição atual da aeronave
+    const pontoAtras = turf.destination(pontoAviao, 500, (rumoVooVerdadeiro + 180) % 360, { units: 'kilometers' });
+    const pontoFrente = turf.destination(pontoAviao, 1000, rumoVooVerdadeiro, { units: 'kilometers' });
+    const linhaVoo = turf.lineString([pontoAtras.geometry.coordinates, pontoFrente.geometry.coordinates]);
 
-    // Encontra o ponto de através na linha de voo
+    // O ponto de través é a interseção perpendicular exata da estação/fixo com a linha de voo
     const pontoTraves = turf.nearestPointOnLine(linhaVoo, pontoDestino);
 
     lngTraves = pontoTraves.geometry.coordinates[0];
@@ -627,7 +627,7 @@ async function processarComandoEstimado(aircraft, comando) {
 }
 
 function desenharCenarioEstimado(latFixo, lngFixo, nomePonto, distFixoNM, latTraves, lngTraves, distTravesNM, gs) {
-    // 1. MARCANDO O FIXO / AERÓDROMO (PONTO PRETO)
+    // 1. DADOS DO FIXO (PONTO PRETO COM TOOLTIP PERMANENTE)
     const tempoHorasFixo = distFixoNM / gs;
     const minFixo = Math.round(tempoHorasFixo * 60);
     const agoraFixo = new Date();
@@ -650,29 +650,29 @@ function desenharCenarioEstimado(latFixo, lngFixo, nomePonto, distFixoNM, latTra
     });
     window.estimadosMarkers.push(markerFixo);
 
-    // 2. MARCANDO O TRAVÉS NA ROTA (PONTO CINZA COM VISIBILIDADE PERMANENTE)
+    // 2. DADOS DO TRAVÉS (PONTO CINZA NA ROTA - TOOLTIP APENAS NO HOVER)
     if (latTraves !== null && lngTraves !== null) {
         const tempoHorasTraves = distTravesNM / gs;
         const minTraves = Math.round(tempoHorasTraves * 60);
         const agoraTraves = new Date();
         agoraTraves.setMinutes(agoraTraves.getMinutes() + minTraves);
         const horaTravesStr = `${agoraTraves.getHours().toString().padStart(2, '0')}:${agoraTraves.getMinutes().toString().padStart(2, '0')}`;
-        const textoTraves = `TRAVÉS +${minTraves.toString().padStart(2, '0')}' ${horaTravesStr}`;
+        const textoTraves = `TRAVÉS ${nomePonto} +${minTraves.toString().padStart(2, '0')}' ${horaTravesStr}`;
 
         const iconTraves = L.divIcon({
             className: 'ponto-traves-icon',
-            html: '<div style="width:8px; height:8px; background-color:#808080; border-radius:50%; border:1px solid #000;"></div>',
+            html: '<div style="width:8px; height:8px; background-color:#808080; border-radius:50%; border:1px solid #333;"></div>',
             iconSize: [8, 8],
             iconAnchor: [4, 4]
         });
 
         const markerTraves = L.marker([latTraves, lngTraves], { icon: iconTraves }).addTo(window.aircraftMap);
         
-        // Exibição PERMANENTE do estimador de através
+        // Tooltip aparece apenas ao passar o mouse sobre o ponto de través
         markerTraves.bindTooltip(textoTraves, {
-            permanent: true,
-            direction: "left",
-            offset: [-10, 0],
+            permanent: false,
+            direction: "top",
+            offset: [0, -10],
             className: "tooltip-estimado-resultado"
         });
 
